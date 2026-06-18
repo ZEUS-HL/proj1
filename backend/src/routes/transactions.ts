@@ -7,8 +7,11 @@ import {
   deleteTransaction,
   getSummary,
 } from '../controllers/transactionController';
+import { requireAuth } from '../middleware/auth';
 
 const router = Router();
+
+router.use(requireAuth);
 
 router.get('/summary', getSummary);
 router.get('/', getTransactions);
