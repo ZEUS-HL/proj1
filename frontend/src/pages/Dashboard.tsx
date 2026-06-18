@@ -11,7 +11,7 @@ import TransactionForm from '../components/TransactionForm';
 
 export default function Dashboard() {
   const {
-    transactions, summary, filters, loading,
+    transactions, summary, filters, loading, error,
     fetchTransactions, fetchSummary, setFilters,
     createTransaction, updateTransaction, deleteTransaction, toggleComplete,
   } = useTransactionStore();
@@ -120,6 +120,7 @@ export default function Dashboard() {
           <TransactionList
             transactions={transactions}
             loading={loading}
+            error={error}
             search={filters.search}
             onEdit={handleEdit}
             onDelete={deleteTransaction}
