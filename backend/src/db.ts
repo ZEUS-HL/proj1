@@ -80,16 +80,19 @@ export const userDb = {
 const db = {
   all: async (userId: number, filters: { category?: string; from?: string; to?: string; type?: string }): Promise<DbRow[]> => {
     const dbConn = sql();
-    let query = dbConn`
+    const rows = await dbConn`
       SELECT * FROM transactions
       WHERE user_id = ${userId}
-      ${ filters.category ? dbConn`AND category = ${filters.category}` : dbConn`` }
-      ${ filters.from ? dbConn`AND date >= ${filters.from}` : dbConn`` }
-      ${ filters.to ? dbConn`AND date <= ${filters.to}` : dbConn`` }
-      ${ filters.type === 'income' ? dbConn`AND amount > 0` : filters.type === 'expense' ? dbConn`AND amount < 0` : dbConn`` }
+        AND (${filters.category ?? null}::text IS NULL OR category = ${filters.category ?? null})
+        AND (${filters.from ?? null}::text IS NULL OR date >= ${filters.from ?? null}::date)
+        AND (${filters.to ?? null}::text IS NULL OR date <= ${filters.to ?? null}::date)
+        AND (
+          ${filters.type ?? null}::text IS NULL
+          OR (${filters.type ?? null} = 'income' AND amount > 0)
+          OR (${filters.type ?? null} = 'expense' AND amount < 0)
+        )
       ORDER BY date DESC, created_at DESC
     `;
-    const rows = await query;
     return rows.map(toRow);
   },
 
