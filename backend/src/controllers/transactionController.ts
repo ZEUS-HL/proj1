@@ -1,6 +1,7 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import db from '../db';
 import { CreateTransactionDTO, UpdateTransactionDTO } from '../types/transaction';
+import { AuthRequest } from '../middleware/auth';
 
 const AUTO_CATEGORIES: { keywords: string[]; category: string }[] = [
   { keywords: ['uber', 'taxi', 'bus', 'metro', 'train', 'fuel', 'gas', 'parking'], category: 'Transport' },
@@ -23,9 +24,10 @@ function autoCategory(title: string): string {
 
 const toClient = (r: any) => ({ ...r, completed: Boolean(r.completed) });
 
-export const getTransactions = (req: Request, res: Response) => {
+export const getTransactions = (req: AuthRequest, res: Response) => {
+  const userId = req.userId!;
   const { category, from, to, type } = req.query;
-  const rows = db.all(r => {
+  const rows = db.all(userId, r => {
     if (category && r.category !== category) return false;
     if (from && r.date < (from as string)) return false;
     if (to && r.date > (to as string)) return false;
@@ -36,23 +38,25 @@ export const getTransactions = (req: Request, res: Response) => {
   res.json(rows.map(toClient));
 };
 
-export const createTransaction = (req: Request, res: Response) => {
+export const createTransaction = (req: AuthRequest, res: Response) => {
+  const userId = req.userId!;
   const { title, amount, category, date, notes }: CreateTransactionDTO = req.body;
   if (!title || amount === undefined || !date) {
     return res.status(400).json({ error: 'title, amount, and date are required' });
   }
   const cat = (!category || category === 'Auto') ? autoCategory(title) : category;
-  const row = db.insert({ title, amount, category: cat, date, notes: notes || '', completed: 0 });
+  const row = db.insert({ user_id: userId, title, amount, category: cat, date, notes: notes || '', completed: 0 });
   res.status(201).json(toClient(row));
 };
 
-export const updateTransaction = (req: Request, res: Response) => {
+export const updateTransaction = (req: AuthRequest, res: Response) => {
+  const userId = req.userId!;
   const id = parseInt(req.params.id);
-  const existing = db.get(id);
+  const existing = db.get(id, userId);
   if (!existing) return res.status(404).json({ error: 'Not found' });
 
   const { title, amount, category, date, notes, completed }: UpdateTransactionDTO = req.body;
-  const row = db.update(id, {
+  const row = db.update(id, userId, {
     title: title ?? existing.title,
     amount: amount ?? existing.amount,
     category: category ?? existing.category,
@@ -63,20 +67,22 @@ export const updateTransaction = (req: Request, res: Response) => {
   res.json(toClient(row));
 };
 
-export const toggleComplete = (req: Request, res: Response) => {
+export const toggleComplete = (req: AuthRequest, res: Response) => {
+  const userId = req.userId!;
   const id = parseInt(req.params.id);
-  const existing = db.get(id);
+  const existing = db.get(id, userId);
   if (!existing) return res.status(404).json({ error: 'Not found' });
-  const row = db.update(id, { completed: existing.completed ? 0 : 1 });
+  const row = db.update(id, userId, { completed: existing.completed ? 0 : 1 });
   res.json(toClient(row));
 };
 
-export const deleteTransaction = (req: Request, res: Response) => {
+export const deleteTransaction = (req: AuthRequest, res: Response) => {
+  const userId = req.userId!;
   const id = parseInt(req.params.id);
-  if (!db.delete(id)) return res.status(404).json({ error: 'Not found' });
+  if (!db.delete(id, userId)) return res.status(404).json({ error: 'Not found' });
   res.status(204).send();
 };
 
-export const getSummary = (_req: Request, res: Response) => {
-  res.json(db.summary());
+export const getSummary = (req: AuthRequest, res: Response) => {
+  res.json(db.summary(req.userId!));
 };

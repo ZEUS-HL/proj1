@@ -1,9 +1,18 @@
 import { Transaction, Summary } from '../types/transaction';
+import { AuthResponse } from '../types/auth';
 
 const BASE = '/api/transactions';
+const AUTH = '/api/auth';
+
+function getToken(): string | null {
+  return localStorage.getItem('et_token');
+}
 
 async function request<T>(url: string, opts?: RequestInit): Promise<T> {
-  const res = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...opts });
+  const token = getToken();
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const res = await fetch(url, { headers, ...opts });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(err.error || 'Request failed');
@@ -13,12 +22,17 @@ async function request<T>(url: string, opts?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  register: (name: string, email: string, password: string) =>
+    request<AuthResponse>(`${AUTH}/register`, { method: 'POST', body: JSON.stringify({ name, email, password }) }),
+  login: (email: string, password: string) =>
+    request<AuthResponse>(`${AUTH}/login`, { method: 'POST', body: JSON.stringify({ email, password }) }),
+
   getTransactions: (params?: Record<string, string>) => {
     const qs = params ? '?' + new URLSearchParams(params).toString() : '';
     return request<Transaction[]>(`${BASE}${qs}`);
   },
   getSummary: () => request<Summary>(`${BASE}/summary`),
-  createTransaction: (data: Omit<Transaction, 'id' | 'completed' | 'created_at'>) =>
+  createTransaction: (data: Omit<Transaction, 'id' | 'completed' | 'created_at' | 'user_id'>) =>
     request<Transaction>(BASE, { method: 'POST', body: JSON.stringify(data) }),
   updateTransaction: (id: number, data: Partial<Transaction>) =>
     request<Transaction>(`${BASE}/${id}`, { method: 'PUT', body: JSON.stringify(data) }),

@@ -6,7 +6,7 @@ const CATEGORIES = ['Auto', 'Income', 'Food', 'Transport', 'Housing', 'Health', 
 
 interface Props {
   onClose: () => void;
-  onSubmit: (data: Omit<Transaction, 'id' | 'completed' | 'created_at'>) => Promise<void>;
+  onSubmit: (data: Omit<Transaction, 'id' | 'completed' | 'created_at' | 'user_id'>) => Promise<void>;
   initial?: Transaction | null;
 }
 
@@ -31,7 +31,7 @@ export default function TransactionForm({ onClose, onSubmit, initial }: Props) {
     setError('');
     try {
       const numAmount = parseFloat(form.amount) * (form.type === 'expense' ? -1 : 1);
-      await onSubmit({ title: form.title, amount: numAmount, category: form.category, date: form.date, notes: form.notes });
+      await onSubmit({ title: form.title, amount: numAmount, category: form.category, date: form.date, notes: form.notes } as Omit<Transaction, 'id' | 'completed' | 'created_at' | 'user_id'>);
       onClose();
     } catch (e: any) {
       setError(e.message);

@@ -11,7 +11,7 @@ interface TransactionState {
   setFilters: (f: Partial<Filters>) => void;
   fetchTransactions: () => Promise<void>;
   fetchSummary: () => Promise<void>;
-  createTransaction: (data: Omit<Transaction, 'id' | 'completed' | 'created_at'>) => Promise<void>;
+  createTransaction: (data: Omit<Transaction, 'id' | 'completed' | 'created_at' | 'user_id'>) => Promise<void>;
   updateTransaction: (id: number, data: Partial<Transaction>) => Promise<void>;
   toggleComplete: (id: number) => Promise<void>;
   deleteTransaction: (id: number) => Promise<void>;
@@ -51,7 +51,7 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
     }
   },
 
-  createTransaction: async (data) => {
+  createTransaction: async (data: Omit<Transaction, 'id' | 'completed' | 'created_at' | 'user_id'>) => {
     const t = await api.createTransaction(data);
     set(s => ({ transactions: [t, ...s.transactions] }));
     get().fetchSummary();
