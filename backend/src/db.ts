@@ -81,19 +81,17 @@ const db = {
   all: async (userId: number, filters: { category?: string; from?: string; to?: string; type?: string }): Promise<DbRow[]> => {
     const dbConn = sql();
     const rows = await dbConn`
-      SELECT * FROM transactions
-      WHERE user_id = ${userId}
-        AND (${filters.category ?? null}::text IS NULL OR category = ${filters.category ?? null})
-        AND (${filters.from ?? null}::text IS NULL OR date >= ${filters.from ?? null}::date)
-        AND (${filters.to ?? null}::text IS NULL OR date <= ${filters.to ?? null}::date)
-        AND (
-          ${filters.type ?? null}::text IS NULL
-          OR (${filters.type ?? null} = 'income' AND amount > 0)
-          OR (${filters.type ?? null} = 'expense' AND amount < 0)
-        )
+      SELECT * FROM transactions WHERE user_id = ${userId}
       ORDER BY date DESC, created_at DESC
     `;
-    return rows.map(toRow);
+    return rows.map(toRow).filter(r => {
+      if (filters.category && r.category !== filters.category) return false;
+      if (filters.from && r.date < filters.from) return false;
+      if (filters.to && r.date > filters.to) return false;
+      if (filters.type === 'income' && r.amount <= 0) return false;
+      if (filters.type === 'expense' && r.amount >= 0) return false;
+      return true;
+    });
   },
 
   get: async (id: number, userId: number): Promise<DbRow | undefined> => {
@@ -113,15 +111,25 @@ const db = {
   },
 
   update: async (id: number, userId: number, data: Partial<DbRow>): Promise<DbRow | undefined> => {
+    const existing = await db.get(id, userId);
+    if (!existing) return undefined;
+    const merged = {
+      title: data.title ?? existing.title,
+      amount: data.amount ?? existing.amount,
+      category: data.category ?? existing.category,
+      date: data.date ?? existing.date,
+      notes: data.notes !== undefined ? data.notes : existing.notes,
+      completed: data.completed !== undefined ? Boolean(data.completed) : existing.completed,
+    };
     const dbConn = sql();
     const rows = await dbConn`
       UPDATE transactions SET
-        title = COALESCE(${data.title ?? null}, title),
-        amount = COALESCE(${data.amount ?? null}, amount),
-        category = COALESCE(${data.category ?? null}, category),
-        date = COALESCE(${data.date ?? null}, date),
-        notes = COALESCE(${data.notes ?? null}, notes),
-        completed = COALESCE(${data.completed !== undefined ? Boolean(data.completed) : null}, completed)
+        title = ${merged.title},
+        amount = ${merged.amount},
+        category = ${merged.category},
+        date = ${merged.date},
+        notes = ${merged.notes ?? null},
+        completed = ${merged.completed}
       WHERE id = ${id} AND user_id = ${userId}
       RETURNING *
     `;
