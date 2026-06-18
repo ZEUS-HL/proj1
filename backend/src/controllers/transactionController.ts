@@ -1,5 +1,5 @@
 import { Response } from 'express';
-import db from '../db';
+import db, { ensureInit } from '../db';
 import { CreateTransactionDTO, UpdateTransactionDTO } from '../types/transaction';
 import { AuthRequest } from '../middleware/auth';
 
@@ -22,67 +22,63 @@ function autoCategory(title: string): string {
   return 'Other';
 }
 
-const toClient = (r: any) => ({ ...r, completed: Boolean(r.completed) });
-
-export const getTransactions = (req: AuthRequest, res: Response) => {
-  const userId = req.userId!;
-  const { category, from, to, type } = req.query;
-  const rows = db.all(userId, r => {
-    if (category && r.category !== category) return false;
-    if (from && r.date < (from as string)) return false;
-    if (to && r.date > (to as string)) return false;
-    if (type === 'income' && r.amount <= 0) return false;
-    if (type === 'expense' && r.amount >= 0) return false;
-    return true;
-  });
-  res.json(rows.map(toClient));
+export const getTransactions = async (req: AuthRequest, res: Response) => {
+  try {
+    await ensureInit();
+    const { category, from, to, type } = req.query as Record<string, string>;
+    const rows = await db.all(req.userId!, { category, from, to, type });
+    res.json(rows);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
 };
 
-export const createTransaction = (req: AuthRequest, res: Response) => {
-  const userId = req.userId!;
-  const { title, amount, category, date, notes }: CreateTransactionDTO = req.body;
-  if (!title || amount === undefined || !date) {
-    return res.status(400).json({ error: 'title, amount, and date are required' });
-  }
-  const cat = (!category || category === 'Auto') ? autoCategory(title) : category;
-  const row = db.insert({ user_id: userId, title, amount, category: cat, date, notes: notes || '', completed: 0 });
-  res.status(201).json(toClient(row));
+export const createTransaction = async (req: AuthRequest, res: Response) => {
+  try {
+    await ensureInit();
+    const { title, amount, category, date, notes }: CreateTransactionDTO = req.body;
+    if (!title || amount === undefined || !date) {
+      return res.status(400).json({ error: 'title, amount, and date are required' });
+    }
+    const cat = (!category || category === 'Auto') ? autoCategory(title) : category;
+    const row = await db.insert({ user_id: req.userId!, title, amount, category: cat, date, notes: notes || '', completed: false });
+    res.status(201).json(row);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
 };
 
-export const updateTransaction = (req: AuthRequest, res: Response) => {
-  const userId = req.userId!;
-  const id = parseInt(req.params.id);
-  const existing = db.get(id, userId);
-  if (!existing) return res.status(404).json({ error: 'Not found' });
-
-  const { title, amount, category, date, notes, completed }: UpdateTransactionDTO = req.body;
-  const row = db.update(id, userId, {
-    title: title ?? existing.title,
-    amount: amount ?? existing.amount,
-    category: category ?? existing.category,
-    date: date ?? existing.date,
-    notes: notes !== undefined ? notes : existing.notes,
-    completed: completed !== undefined ? (completed ? 1 : 0) : existing.completed,
-  });
-  res.json(toClient(row));
+export const updateTransaction = async (req: AuthRequest, res: Response) => {
+  try {
+    await ensureInit();
+    const id = parseInt(req.params.id);
+    const existing = await db.get(id, req.userId!);
+    if (!existing) return res.status(404).json({ error: 'Not found' });
+    const { title, amount, category, date, notes, completed }: UpdateTransactionDTO = req.body;
+    const row = await db.update(id, req.userId!, { title, amount, category, date, notes, completed });
+    res.json(row);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
 };
 
-export const toggleComplete = (req: AuthRequest, res: Response) => {
-  const userId = req.userId!;
-  const id = parseInt(req.params.id);
-  const existing = db.get(id, userId);
-  if (!existing) return res.status(404).json({ error: 'Not found' });
-  const row = db.update(id, userId, { completed: existing.completed ? 0 : 1 });
-  res.json(toClient(row));
+export const toggleComplete = async (req: AuthRequest, res: Response) => {
+  try {
+    await ensureInit();
+    const id = parseInt(req.params.id);
+    const existing = await db.get(id, req.userId!);
+    if (!existing) return res.status(404).json({ error: 'Not found' });
+    const row = await db.update(id, req.userId!, { completed: !existing.completed });
+    res.json(row);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
 };
 
-export const deleteTransaction = (req: AuthRequest, res: Response) => {
-  const userId = req.userId!;
-  const id = parseInt(req.params.id);
-  if (!db.delete(id, userId)) return res.status(404).json({ error: 'Not found' });
-  res.status(204).send();
+export const deleteTransaction = async (req: AuthRequest, res: Response) => {
+  try {
+    await ensureInit();
+    const id = parseInt(req.params.id);
+    if (!await db.delete(id, req.userId!)) return res.status(404).json({ error: 'Not found' });
+    res.status(204).send();
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
 };
 
-export const getSummary = (req: AuthRequest, res: Response) => {
-  res.json(db.summary(req.userId!));
+export const getSummary = async (req: AuthRequest, res: Response) => {
+  try {
+    await ensureInit();
+    res.json(await db.summary(req.userId!));
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
 };

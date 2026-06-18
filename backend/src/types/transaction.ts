@@ -10,6 +10,8 @@ export interface Transaction {
   created_at: string;
 }
 
+export type DbRow = Transaction;
+
 export interface CreateTransactionDTO {
   title: string;
   amount: number;
