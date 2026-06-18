@@ -1,18 +1,19 @@
 import React from 'react';
-import { Receipt } from 'lucide-react';
+import { Receipt, AlertCircle } from 'lucide-react';
 import { Transaction } from '../types/transaction';
 import TransactionItem from './TransactionItem';
 
 interface Props {
   transactions: Transaction[];
   loading: boolean;
+  error: string | null;
   search: string;
   onEdit: (t: Transaction) => void;
   onDelete: (id: number) => void;
   onToggle: (id: number) => void;
 }
 
-export default function TransactionList({ transactions, loading, search, onEdit, onDelete, onToggle }: Props) {
+export default function TransactionList({ transactions, loading, error, search, onEdit, onDelete, onToggle }: Props) {
   const filtered = search
     ? transactions.filter(t =>
         t.title.toLowerCase().includes(search.toLowerCase()) ||
@@ -36,6 +37,16 @@ export default function TransactionList({ transactions, loading, search, onEdit,
             </div>
           </div>
         ))}
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 text-red-400">
+        <AlertCircle className="w-10 h-10 mb-3 opacity-60" />
+        <p className="text-sm font-medium text-red-500">Failed to load transactions</p>
+        <p className="text-xs mt-1 text-red-400 max-w-xs text-center">{error}</p>
       </div>
     );
   }
